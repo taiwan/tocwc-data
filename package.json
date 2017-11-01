@@ -12,6 +12,7 @@
   "author": "Po-Ying Chen <poying.me@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "batch-promises": "0.0.3",
     "bunyan": "^1.8.12",
     "puppeteer": "^0.12.0"
   }

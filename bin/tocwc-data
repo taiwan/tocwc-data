@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
+const os = require('os');
 const bunyan = require('bunyan');
 const puppeteer = require('puppeteer');
+const batch = require('batch-promises');
 const pkg = require('../package.json');
 const logger = bunyan.createLogger({
   name: pkg.name,
@@ -26,12 +28,19 @@ async function main() {
     logger.trace('Browser console: %s', msg);
   });
 
+  logger.info('Go to home page');
   await page.goto('http://www.tocwc.org.tw/cgi-bin/gs32/gsweb.cgi');
   await ready(page);
+  logger.info('Go to category page');
   await gotoBrowsePage(page);
+  logger.info('Go to list page');
   await gotoCourseListPage(page);
+  logger.info('Update list page settings');
   await changeSettings(page);
+  logger.info('Get information of all courses');
   const courseList = await getCourseList(page);
+  logger.info('Expand course url');
+  await batch(os.cpus().length * 2, courseList, unshortenCourseUrl.bind(null, browser));
 
   await new Promise((resolve, reject) => {
     const content = flags.pretty
@@ -152,6 +161,31 @@ async function getCourseList(page) {
 
 function ready(page) {
   return page.waitFor('#footer');
+}
+
+async function unshortenCourseUrl(browser, course) {
+  const page = await browser.newPage();
+  try {
+    await page.goto(course.url);
+    await ready(page);
+    course.url = await page.evaluate(() => {
+      const trList = Array.from(document.querySelectorAll('#format0_disparea tr'));
+      const tr = trList.find(tr => tr.querySelector('th').innerText.trim() === '網址');
+      if (!tr) {
+        return null;
+      }
+      const link = tr.querySelector('td a');
+      return link ? link.href : null;
+    });
+  } catch (e) {
+    await page.close();
+    throw e;
+  }
+  if (!course.url) {
+    logger.error({ course }, 'missing url');
+  }
+  await page.close();
+  return course;
 }
 
 main().then(success, fail);
