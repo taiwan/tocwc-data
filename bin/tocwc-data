@@ -16,6 +16,7 @@ const flags = {
   help: false,
   pretty: false
 };
+const concurrent = os.cpus().length * 2;
 var outputFile;
 var browser;
 
@@ -39,8 +40,10 @@ async function main() {
   await changeSettings(page);
   logger.info('Get information of all courses');
   const courseList = await getCourseList(page);
+
   logger.info('Expand course url');
-  await batch(os.cpus().length * 2, courseList, unshortenCourseUrl.bind(null, browser));
+  const pages = await Promise.all('0'.repeat(concurrent).split('').map(() => browser.newPage()));
+  await batch(concurrent, courseList, unshortenCourseUrl.bind(null, pages));
 
   await new Promise((resolve, reject) => {
     const content = flags.pretty
@@ -163,29 +166,22 @@ function ready(page) {
   return page.waitFor('#footer');
 }
 
-async function unshortenCourseUrl(browser, course) {
-  const page = await browser.newPage();
-  try {
-    await page.goto(course.url);
-    await ready(page);
-    course.url = await page.evaluate(() => {
-      const trList = Array.from(document.querySelectorAll('#format0_disparea tr'));
-      const tr = trList.find(tr => tr.querySelector('th').innerText.trim() === '網址');
-      if (!tr) {
-        return null;
-      }
-      const link = tr.querySelector('td a');
-      return link ? link.href : null;
-    });
-  } catch (e) {
-    await page.close();
-    throw e;
-  }
+async function unshortenCourseUrl(pages, course, index) {
+  const page = pages[index % concurrent];
+  await page.goto(course.url);
+  await ready(page);
+  course.url = await page.evaluate(() => {
+    const trList = Array.from(document.querySelectorAll('#format0_disparea tr'));
+    const tr = trList.find(tr => tr.querySelector('th').innerText.trim() === '網址');
+    if (!tr) {
+      return null;
+    }
+    const link = tr.querySelector('td a');
+    return link ? link.href : null;
+  });
   if (!course.url) {
     logger.error({ course }, 'missing url');
   }
-  await page.close();
-  return course;
 }
 
 main().then(success, fail);
