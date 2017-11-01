@@ -22,10 +22,8 @@ async function main() {
 
   browser = await puppeteer.launch();
   const page = await browser.newPage();
-  page.on('console', msgs => {
-    msgs.forEach(msg => {
-      logger.trace('Browser console: %s', msg);
-    });
+  page.on('console', msg => {
+    logger.trace('Browser console: %s', msg);
   });
 
   await page.goto('http://www.tocwc.org.tw/cgi-bin/gs32/gsweb.cgi');
