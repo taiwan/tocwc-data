@@ -168,7 +168,7 @@ function ready(page) {
 
 async function unshortenCourseUrl(pages, course, index) {
   const page = pages[index % concurrent];
-  await page.goto(course.url);
+  await page.goto(course.url, { timeout: 0 });
   await ready(page);
   course.url = await page.evaluate(() => {
     const trList = Array.from(document.querySelectorAll('#format0_disparea tr'));
