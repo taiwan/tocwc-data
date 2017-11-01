@@ -4,10 +4,10 @@ oldfile="courses.json"
 newfile="./build/courses-new.json"
 
 git branch -D build || true
-git branch -b build
+git checkout -b build
 rm -rf build
 mkdir build
-git checkout gh-pages "$oldfile"
+git checkout origin/gh-pages "$oldfile"
 ./bin/tocwc-data "$newfile"
 
 oldsize=`wc -c $oldfile | cut -d' ' -f1`
