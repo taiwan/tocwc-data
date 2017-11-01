@@ -1,0 +1,157 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const bunyan = require('bunyan');
+const puppeteer = require('puppeteer');
+const pkg = require('../package.json');
+const logger = bunyan.createLogger({
+  name: pkg.name,
+  version: pkg.version,
+  serializers: bunyan.stdSerializers
+});
+const skip = {};
+const flags = {
+  help: false,
+  pretty: false
+};
+var outputFile;
+var browser;
+
+async function main() {
+  parseCli();
+
+  browser = await puppeteer.launch();
+  const page = await browser.newPage();
+  page.on('console', msgs => {
+    msgs.forEach(msg => {
+      logger.trace('Browser console: %s', msg);
+    });
+  });
+
+  await page.goto('http://www.tocwc.org.tw/cgi-bin/gs32/gsweb.cgi');
+  await ready(page);
+  await gotoBrowsePage(page);
+  await gotoCourseListPage(page);
+  await changeSettings(page);
+  const courseList = await getCourseList(page);
+
+  await new Promise((resolve, reject) => {
+    const content = flags.pretty
+      ? JSON.stringify(courseList, null, 2)
+      : JSON.stringify(courseList);
+    fs.writeFile(outputFile, content, err => {
+      err ? reject(err) : resolve();
+    });
+  });
+}
+
+async function success() {
+  logger.info('success');
+  await closeBrowser();
+}
+
+async function fail(err) {
+  if (err !== skip) {
+    logger.error({ err }, 'error');
+    await closeBrowser();
+  }
+  process.exit(1);
+}
+
+function help() {
+  console.log();
+  console.log('  $ tocwc-data [--pretty] <filepath>');
+  console.log();
+  throw skip;
+}
+
+function parseCli() {
+  const flagRe = /^--/;
+  process.argv.slice(2).forEach(val => {
+    if (flagRe.test(val)) {
+      const flag = val.substr(2);
+      if (!flags.hasOwnProperty(flag)) {
+        help();
+      }
+      flags[flag] = true;
+    } {
+      outputFile = val;
+    }
+  });
+  if (!outputFile || flags.help) {
+    help();
+  }
+}
+
+async function closeBrowser() {
+  if (browser) {
+    logger.info('close browser');
+    await browser.close();
+  }
+}
+
+async function gotoBrowsePage(page) {
+  const browsePageUrl = await page.evaluate(() => {
+    const re = /searchmode=browse/;
+    const links = Array.from(document.querySelectorAll('a'));
+    const link = links.filter(link => re.test(link.href))[0];
+    return link ? link.href : null;
+  });
+  if (!browsePageUrl) {
+    throw new Error('failed to get url of browsing page');
+  }
+  await page.goto(browsePageUrl);
+  await ready(page);
+}
+
+async function gotoCourseListPage(page) {
+  const courseListPage = await page.evaluate(() => {
+    const links = Array.from(document.querySelectorAll('a'));
+    const link = links.filter(link => link.innerText.trim() === '課程資料')[0];
+    return link ? link.href : null;
+  });
+  if (!courseListPage) {
+    throw new Error('failed to get url of course list page');
+  }
+  await page.goto(courseListPage);
+  await ready(page);
+}
+
+async function changeSettings(page) {
+  await page.evaluate(() => {
+    document.getElementById('SubmitChangePage').value = '1';
+    document.querySelector('select[name="jpsize"] option[selected]').value = '10000';
+    document.querySelector('form').submit();
+  });
+  await page.waitFor(1000);
+  await page.reload();
+  await ready(page);
+}
+
+async function getCourseList(page) {
+  const courseList = await page.evaluate(() => {
+    const trList = Array.from(document.querySelectorAll('#tablefmt1 tr'));
+    const courseList = trList.slice(1).map(tr => {
+      const tdList = Array.from(tr.querySelectorAll('td'));
+      const teacher = tdList[5].innerHTML.trim().split('<br>');
+      const url = tdList[4].querySelector('a');
+      return {
+        school: tdList[3].innerText.trim(),
+        name: tdList[4].innerText.trim(),
+        url: url ? url.href : null,
+        teacher: {
+          name: teacher[0],
+          department: teacher[1] || null
+        }
+      };
+    });
+    return courseList;
+  });
+  return JSON.parse(courseList);
+}
+
+function ready(page) {
+  return page.waitFor('#footer');
+}
+
+main().then(success, fail);
