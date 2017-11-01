@@ -12,7 +12,7 @@ git checkout -b build
 rm -rf build
 mkdir build
 git checkout origin/gh-pages "$oldfile"
-./bin/tocwc-data "$newfile"
+./bin/tocwc-data --progress "$newfile"
 
 oldsize=`wc -c $oldfile | cut -d' ' -f1`
 newsize=`wc -c $newfile | cut -d' ' -f1`

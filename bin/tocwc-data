@@ -5,6 +5,7 @@ const os = require('os');
 const bunyan = require('bunyan');
 const puppeteer = require('puppeteer');
 const batch = require('batch-promises');
+const ProgressBar = require('progress');
 const pkg = require('../package.json');
 const logger = bunyan.createLogger({
   name: pkg.name,
@@ -14,7 +15,8 @@ const logger = bunyan.createLogger({
 const skip = {};
 const flags = {
   help: false,
-  pretty: false
+  pretty: false,
+  progress: false
 };
 const concurrent = os.cpus().length * 2;
 var outputFile;
@@ -22,6 +24,9 @@ var browser;
 
 async function main() {
   parseCli();
+  if (flags.progress) {
+    logger.level('error');
+  }
 
   browser = await puppeteer.launch();
   const page = await browser.newPage();
@@ -43,7 +48,8 @@ async function main() {
 
   logger.info('Expand course url');
   const pages = await Promise.all('0'.repeat(concurrent).split('').map(() => browser.newPage()));
-  await batch(concurrent, courseList, unshortenCourseUrl.bind(null, pages));
+  const bar = flags.progress ? new ProgressBar('  Expand url [:bar] :rate/bps :percent :etas', { total: courseList.length }) : null;
+  await batch(concurrent, courseList, unshortenCourseUrl.bind(null, bar, pages));
 
   await new Promise((resolve, reject) => {
     const content = flags.pretty
@@ -166,7 +172,7 @@ function ready(page) {
   return page.waitFor('#footer');
 }
 
-async function unshortenCourseUrl(pages, course, index) {
+async function unshortenCourseUrl(bar, pages, course, index) {
   const page = pages[index % concurrent];
   await page.goto(course.url, { timeout: 0 });
   await ready(page);
@@ -180,8 +186,9 @@ async function unshortenCourseUrl(pages, course, index) {
     return link ? link.href : null;
   });
   if (!course.url) {
-    logger.error({ course }, 'missing url');
+    logger.info({ course }, 'missing url');
   }
+  bar && bar.tick(1);
 }
 
 main().then(success, fail);
