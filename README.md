@@ -1,4 +1,4 @@
-## tocwc-data
+## tocwc-data [![CircleCI](https://circleci.com/gh/taiwan/tocwc-data.svg?style=svg)](https://circleci.com/gh/taiwan/tocwc-data)
 
 台灣開放式課程聯盟課程清單
 
