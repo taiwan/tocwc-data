@@ -14,20 +14,6 @@ mkdir build
 git checkout origin/gh-pages "$oldfile"
 ./bin/tocwc-data --progress "$newfile"
 
-oldsize=`wc -c $oldfile | cut -d' ' -f1`
-newsize=`wc -c $newfile | cut -d' ' -f1`
-
-if [ $oldsize -gt $newsize ]
-then
-  echo "The old file is larger than the new one"
-  exit 1
-fi
-
-if [ $oldsize -eq $newsize ]
-then
-  exit 0
-fi
-
 mv "$newfile" "$oldfile"
 rm -rf build
 git add .
