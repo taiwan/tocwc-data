@@ -20,6 +20,10 @@ git add .
 git commit -m 'build'
 git checkout gh-pages
 git checkout build "$oldfile"
-git add "$oldfile"
-git commit -m "circleci ${date}"
-git push
+
+if ! git diff-files --quiet --ignore-submodules --
+then
+  git add "$oldfile"
+  git commit -m "circleci ${date}"
+  git push
+fi
