@@ -35,7 +35,7 @@ async function main() {
   });
 
   logger.info('Go to home page');
-  await page.goto('http://www.tocwc.org.tw/cgi-bin/gs32/gsweb.cgi');
+  await page.goto('http://www.tocwc.org.tw/cgi-bin/gs32/gsweb.cgi', { timeout: 0 });
   await ready(page);
   logger.info('Go to category page');
   await gotoBrowsePage(page);
@@ -116,7 +116,7 @@ async function gotoBrowsePage(page) {
   if (!browsePageUrl) {
     throw new Error('failed to get url of browsing page');
   }
-  await page.goto(browsePageUrl);
+  await page.goto(browsePageUrl, { timeout: 0 });
   await ready(page);
 }
 
@@ -129,7 +129,7 @@ async function gotoCourseListPage(page) {
   if (!courseListPage) {
     throw new Error('failed to get url of course list page');
   }
-  await page.goto(courseListPage);
+  await page.goto(courseListPage, { timeout: 0 });
   await ready(page);
 }
 
